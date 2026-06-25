@@ -930,8 +930,12 @@ async function pollGames() {
     favorites.forEach(fav => {
       const id = fav.id;
       if (gamesMap[id]) {
+        const prev = getMatchState(favMatchData[id]);
+        const curr = getMatchState(gamesMap[id]);
+        if (JSON.stringify(prev) !== JSON.stringify(curr)) {
+          changed = true;
+        }
         favMatchData[id] = gamesMap[id];
-        changed = true;
       }
     });
     if (changed) {
