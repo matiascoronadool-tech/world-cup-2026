@@ -26,7 +26,7 @@
 body {
   height: 100vh;
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  grid-template-rows: auto auto auto auto 1fr auto;
   font-family: var(--font);
   background: var(--bg-primary);
   color: var(--text-primary);
@@ -458,6 +458,220 @@ section {
 
 .group-toggle.nested .group-body {
   padding: 0 1rem 0.5rem;
+}
+
+/* STICKY FAVORITES BAR */
+.fav-bar {
+  display: none;
+  background: rgba(35, 55, 43, 0.7);
+  border-bottom: 1px solid rgba(193, 196, 151, 0.04);
+  padding: 0.25rem 1.5rem;
+  font-size: 0.78rem;
+  position: relative;
+  transition: background 0.4s ease;
+  z-index: 5;
+  line-height: 1.5;
+}
+
+.fav-bar.active {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.fav-bar.one {
+  justify-content: center;
+}
+
+.fav-bar.two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.fav-bar.two .fav-match {
+  justify-content: center;
+}
+
+.fav-bar.two .fav-match:first-child {
+  border-right: 1px solid rgba(193, 196, 151, 0.12);
+  padding-right: 1rem;
+}
+
+.fav-bar.two .fav-match:last-child {
+  padding-left: 1rem;
+}
+
+.fav-bar.flash {
+  background: rgba(229, 199, 54, 0.08) !important;
+}
+
+.fav-bar.goal-flash {
+  animation: pulseGlow 1s ease 2;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: inset 0 0 0 0 rgba(229, 199, 54, 0); }
+  50% { box-shadow: inset 0 0 25px -5px rgba(229, 199, 54, 0.1); }
+}
+
+.fav-match {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.fav-bar.one .fav-match {
+  justify-content: center;
+}
+
+.fav-match .flag {
+  width: 18px;
+  height: 12px;
+  border-radius: 1px;
+  object-fit: cover;
+  flex-shrink: 0;
+  margin-right: 0.15rem;
+}
+
+.fav-match .team {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+  max-width: 70px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fav-match .score {
+  font-weight: 700;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.fav-match .vs {
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  margin: 0 2px;
+}
+
+.fav-match .time {
+  color: var(--accent);
+  font-weight: 500;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+
+.fav-match .time.live {
+  color: #2DD5B7;
+  font-weight: 600;
+}
+
+.fav-match .time.finished {
+  color: var(--text-muted);
+}
+
+.fav-match .time.soon {
+  color: #E5C736;
+  font-weight: 600;
+}
+
+.fav-match .countdown-label {
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-right: 0.15rem;
+}
+
+.fav-match.fav-upcoming {
+  flex-wrap: wrap;
+}
+
+.fav-match.fav-upcoming .fav-time-row {
+  flex: 0 0 100%;
+  text-align: center;
+  margin-top: 0.1rem;
+  font-size: 0.65rem;
+}
+
+.fav-match.fav-upcoming .fav-time-row .time {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 0.65rem;
+}
+
+.fav-match.fav-upcoming .fav-time-row .countdown-value {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* FLASH BANNER */
+.flash-banner {
+  display: none;
+  background: #E5C736;
+  color: #111c18;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  padding: 0.2rem 2rem;
+  letter-spacing: 0.3px;
+  position: relative;
+  z-index: 6;
+  animation: slideDown 0.25s ease;
+  line-height: 1.5;
+}
+
+.flash-banner.active {
+  display: block;
+}
+
+/* FAV TOAST */
+.fav-toast {
+  display: none;
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(229, 199, 54, 0.95);
+  color: #111c18;
+  padding: 0.6rem 1.5rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  z-index: 100;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  animation: fadeIn 0.25s ease;
+}
+
+.fav-toast.show {
+  display: block;
+}
+
+/* STAR BUTTON ON MATCH CARDS */
+.star-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--text-muted);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  user-select: none;
+  border-radius: 4px;
+}
+
+.star-btn:hover {
+  color: #E5C736;
+  background: rgba(229, 199, 54, 0.08);
+}
+
+.star-btn.active {
+  color: #E5C736;
+  text-shadow: 0 0 8px rgba(229, 199, 54, 0.4);
 }
 
 /* REDUCED MOTION */

@@ -228,6 +228,13 @@ const i18n = {
     today: 'Today',
     yesterday: 'Yesterday',
     group: 'Group',
+    maxFavs: 'Max 2 favorites — remove one first',
+    startingSoon: 'Starting soon!',
+    matchStarted: 'Match started!',
+    fullTime: 'Full Time',
+    followMatch: 'Follow match',
+    unfollow: 'Unfollow',
+    startsIn: 'Starts in:',
     stage: { r32: 'Round of 32', r16: 'Round of 16', qf: 'Quarter-finals', sf: 'Semi-finals', third: 'Third Place', final: 'Final' },
     months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
     days: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
@@ -246,12 +253,19 @@ const i18n = {
     noPast: 'Sin partidos anteriores',
     failedLoad: 'Error al cargar los partidos',
     retry: 'Reintentar',
-    serverHint: 'Abre esta p\u00E1gina con un servidor local:',
+    serverHint: 'Abre esta página con un servidor local:',
     vs: 'vs',
     live: 'En Vivo',
     today: 'Hoy',
     yesterday: 'Ayer',
     group: 'Grupo',
+    maxFavs: 'Máx 2 favoritos — quita uno primero',
+    startingSoon: '¡Ya casi comienza!',
+    matchStarted: '¡Comenzó el partido!',
+    fullTime: 'Tiempo Completo',
+    followMatch: 'Seguir partido',
+    unfollow: 'Dejar de seguir',
+    startsIn: 'Comienza en:',
     stage: { r32: 'Dieciseisavos', r16: 'Octavos', qf: 'Cuartos', sf: 'Semifinales', third: 'Tercer Puesto', final: 'Final' },
     months: ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
     days: ['Domingo','Lunes','Martes','Mi\u00E9rcoles','Jueves','Viernes','S\u00E1bado'],
@@ -262,6 +276,16 @@ const i18n = {
 let currentLang = localStorage.getItem('wc26-lang') || 'en';
 let currentFacts = currentLang === 'es' ? FACTS_ES : FACTS_EN;
 let factIdx = 0;
+
+const FAV_KEY = 'wc26-favs';
+const MAX_FAVS = 2;
+let favorites = JSON.parse(localStorage.getItem(FAV_KEY) || '[]');
+let favMatchData = {};
+let prevFavState = {};
+let pollInterval = null;
+let countdownInterval = null;
+let flashTimeoutId = null;
+let toastTimeout = null;
 
 function t(key) {
   const keys = key.split('.');
@@ -420,7 +444,23 @@ function teamFlag(team, teamsMap) {
   return tm ? `<img class="flag" src="${tm.flag}" alt="${tm.iso2}" loading="lazy">` : '';
 }
 
+function getMatchId(m) {
+  return `${m.local_date}|${m.home_team_name_en}|${m.away_team_name_en}`;
+}
+
+function getMatchState(m) {
+  if (!m) return null;
+  return {
+    home_score: m.home_score,
+    away_score: m.away_score,
+    time_elapsed: m.time_elapsed,
+    finished: m.finished
+  };
+}
+
 function buildMatchHTML(m, teamsMap, showDate) {
+  const matchId = getMatchId(m);
+  const isFav = favorites.some(f => f.id === matchId);
   const homeTbd = m.home_team_id === '0';
   const awayTbd = m.away_team_id === '0';
   const isFinished = m.finished === 'TRUE';
@@ -451,7 +491,8 @@ function buildMatchHTML(m, teamsMap, showDate) {
   const datePrefix = showDate ? `${fmtShortDate(dt)} \u2014 ` : '';
   const info = m.type === 'group' ? `${m.group ? t('group') + ' ' + m.group : ''}` : stageLabel(m.type);
 
-  return `<li>${datePrefix}${homeDisplay} ${scoreHTML} ${awayDisplay} <span class="match-info">${info}${m.group ? ', ' : ''}${fmtTime(dt)}</span></li>`;
+  const star = `<span class="star-btn${isFav ? ' active' : ''}" data-match-id="${matchId}" title="${t('followMatch')}">${isFav ? '★' : '☆'}</span>`;
+  return `<li>${star}${datePrefix}${homeDisplay} ${scoreHTML} ${awayDisplay} <span class="match-info">${info}${m.group ? ', ' : ''}${fmtTime(dt)}</span></li>`;
 }
 
 function bindAccordions() {
@@ -588,6 +629,7 @@ function renderAll() {
   renderMatches('upcoming-content', cachedData.upcomingMatches, cachedData.teamsMap, groupByDate, false);
   renderPastMatches('past-content', cachedData.pastMatches, cachedData.teamsMap);
   bindAccordions();
+  renderFavBar();
 }
 
 async function loadData() {
@@ -633,8 +675,20 @@ async function loadData() {
       }
     });
 
-    cachedData = { teamsMap, todayMatches, upcomingMatches, pastMatches };
+    const allGamesMap = {};
+    gamesList.forEach(m => { allGamesMap[getMatchId(m)] = m; });
+
+    cachedData = { teamsMap, todayMatches, upcomingMatches, pastMatches, allGamesMap };
     renderAll();
+
+    favorites.forEach(fav => {
+      if (allGamesMap[fav.id]) {
+        favMatchData[fav.id] = allGamesMap[fav.id];
+        prevFavState[fav.id] = getMatchState(allGamesMap[fav.id]);
+      }
+    });
+    renderFavBar();
+    updatePolling();
 
   } catch (err) {
     const isFile = location.protocol === 'file:';
@@ -648,6 +702,244 @@ async function loadData() {
   }
 }
 window.loadData = loadData;
+
+/* ----- FAVORITES & LIVE BAR ----- */
+function saveFavorites() {
+  localStorage.setItem(FAV_KEY, JSON.stringify(favorites));
+}
+
+function updateStarUI() {
+  document.querySelectorAll('.star-btn').forEach(el => {
+    const id = el.dataset.matchId;
+    const isFav = favorites.some(f => f.id === id);
+    el.classList.toggle('active', isFav);
+    el.textContent = isFav ? '★' : '☆';
+    el.title = isFav ? t('unfollow') : t('followMatch');
+  });
+}
+
+function showFavToast(msg) {
+  const el = document.getElementById('fav-toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  if (toastTimeout) clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+function toggleFavorite(matchId) {
+  const idx = favorites.findIndex(f => f.id === matchId);
+  if (idx !== -1) {
+    favorites.splice(idx, 1);
+    delete favMatchData[matchId];
+    delete prevFavState[matchId];
+  } else {
+    if (favorites.length >= MAX_FAVS) {
+      showFavToast(t('maxFavs'));
+      return;
+    }
+    favorites.push({ id: matchId });
+    if (cachedData && cachedData.allGamesMap && cachedData.allGamesMap[matchId]) {
+      favMatchData[matchId] = cachedData.allGamesMap[matchId];
+      prevFavState[matchId] = getMatchState(cachedData.allGamesMap[matchId]);
+    }
+  }
+  saveFavorites();
+  updateStarUI();
+  renderFavBar();
+  updatePolling();
+}
+
+function buildFavMatchHTML(m) {
+  if (!m) return '';
+  const isFinished = m.finished === 'TRUE';
+  const isLive = m.time_elapsed && m.time_elapsed !== 'notstarted' && !isFinished;
+  const teamsMap = (cachedData && cachedData.teamsMap) ? cachedData.teamsMap : {};
+  const matchId = getMatchId(m);
+
+  let homeName, awayName;
+  if (m.home_team_id === '0') {
+    homeName = m.home_team_label || 'TBD';
+  } else {
+    homeName = teamName(m.home_team_name_en);
+  }
+  if (m.away_team_id === '0') {
+    awayName = m.away_team_label || 'TBD';
+  } else {
+    awayName = teamName(m.away_team_name_en);
+  }
+
+  const homeFlag = m.home_team_id !== '0' ? teamFlag(m.home_team_name_en, teamsMap) : '';
+  const awayFlag = m.away_team_id !== '0' ? teamFlag(m.away_team_name_en, teamsMap) : '';
+
+  let scoreHTML, timeHTML, timeClass;
+  if (isFinished) {
+    scoreHTML = `<span class="score">${m.home_score != null ? m.home_score : 0}</span><span class="vs">–</span><span class="score">${m.away_score != null ? m.away_score : 0}</span>`;
+    timeHTML = `<span class="time finished">${t('fullTime')}</span>`;
+    timeClass = 'finished';
+  } else if (isLive) {
+    scoreHTML = `<span class="score">${m.home_score != null ? m.home_score : 0}</span><span class="vs">–</span><span class="score">${m.away_score != null ? m.away_score : 0}</span>`;
+    timeHTML = `<span class="time live">${m.time_elapsed}'</span>`;
+    timeClass = 'live';
+  } else {
+    scoreHTML = `<span class="vs">${t('vs')}</span>`;
+    timeHTML = `<span class="time countdown" data-match-id="${matchId}"><span class="countdown-label">${t('startsIn')}</span> <span class="countdown-value">--:--:--</span></span>`;
+    timeClass = 'countdown';
+  }
+
+  const topRow = `${homeFlag}<span class="team">${homeName}</span>${scoreHTML}<span class="team">${awayName}</span>${awayFlag}`;
+  if (isFinished || isLive) {
+    return `<div class="fav-match">${topRow}${timeHTML}</div>`;
+  }
+  return `<div class="fav-match fav-upcoming">${topRow}<div class="fav-time-row">${timeHTML}</div></div>`;
+}
+
+function renderFavBar() {
+  const bar = document.getElementById('fav-bar');
+  if (favorites.length === 0) {
+    bar.classList.remove('active', 'one', 'two');
+    bar.innerHTML = '';
+    return;
+  }
+  bar.classList.add('active');
+  bar.classList.remove('one', 'two');
+  bar.classList.remove('flash', 'goal-flash');
+
+  if (favorites.length === 1) {
+    bar.classList.add('one');
+    const m = favMatchData[favorites[0].id];
+    bar.innerHTML = buildFavMatchHTML(m);
+  } else {
+    bar.classList.add('two');
+    const m1 = favMatchData[favorites[0].id];
+    const m2 = favMatchData[favorites[1].id];
+    bar.innerHTML = buildFavMatchHTML(m1) + buildFavMatchHTML(m2);
+  }
+}
+
+function updatePolling() {
+  if (favorites.length > 0) {
+    if (!pollInterval) {
+      pollInterval = setInterval(pollGames, 30000);
+    }
+    if (!countdownInterval) {
+      countdownInterval = setInterval(updateCountdowns, 1000);
+    }
+  } else {
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollInterval = null;
+    }
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+  }
+}
+
+function updateCountdowns() {
+  const bar = document.getElementById('fav-bar');
+  if (!bar.classList.contains('active')) return;
+  bar.querySelectorAll('.time.countdown').forEach(el => {
+    const matchId = el.dataset.matchId;
+    if (!matchId) return;
+    const m = favMatchData[matchId];
+    if (!m) return;
+    const dt = parseDateET(m.local_date);
+    const now = new Date();
+    const diff = dt - now;
+    if (diff > 0) {
+      const h = Math.floor(diff / 3600000);
+      const min = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      const val = el.querySelector('.countdown-value');
+      if (val) val.textContent = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    } else {
+      el.innerHTML = t('startingSoon');
+      el.classList.remove('countdown');
+      el.classList.add('soon');
+    }
+  });
+}
+
+function flashFavBar() {
+  const bar = document.getElementById('fav-bar');
+  bar.classList.add('flash', 'goal-flash');
+  setTimeout(() => {
+    bar.classList.remove('flash', 'goal-flash');
+  }, 3000);
+}
+
+function showFlash(msg) {
+  const banner = document.getElementById('flash-banner');
+  if (flashTimeoutId) {
+    clearTimeout(flashTimeoutId);
+    flashTimeoutId = null;
+    banner.textContent = '';
+  }
+  banner.textContent = msg;
+  banner.classList.add('active');
+  flashTimeoutId = setTimeout(() => {
+    banner.classList.remove('active');
+    banner.textContent = '';
+    flashTimeoutId = null;
+  }, 15000);
+}
+
+function checkForEvents() {
+  const events = [];
+  favorites.forEach(fav => {
+    const id = fav.id;
+    const prev = prevFavState[id];
+    const curr = getMatchState(favMatchData[id]);
+    if (!prev || !curr) return;
+    const homeName = favMatchData[id] ? teamName(favMatchData[id].home_team_name_en) : '';
+    const awayName = favMatchData[id] ? teamName(favMatchData[id].away_team_name_en) : '';
+
+    if (prev.home_score !== curr.home_score || prev.away_score !== curr.away_score) {
+      const hs = curr.home_score != null ? curr.home_score : 0;
+      const as = curr.away_score != null ? curr.away_score : 0;
+      events.push(`⚽ ${homeName} ${hs}–${as} ${awayName}`);
+    }
+    if ((prev.time_elapsed === 'notstarted' || !prev.time_elapsed) && curr.time_elapsed && curr.time_elapsed !== 'notstarted') {
+      events.push(`▶ ${t('matchStarted')}`);
+    }
+    if (prev.finished !== 'TRUE' && curr.finished === 'TRUE') {
+      events.push(`🏁 ${t('fullTime')}`);
+    }
+    prevFavState[id] = curr;
+  });
+
+  if (events.length > 0) {
+    showFlash(events.join(' · '));
+    flashFavBar();
+  }
+}
+
+async function pollGames() {
+  try {
+    const res = await fetch(API_BASE + '/get/games', { mode: 'cors' });
+    if (!res.ok) return;
+    const data = await res.json();
+    const gamesList = Array.isArray(data) ? data : (data.games || []);
+    const gamesMap = {};
+    gamesList.forEach(m => {
+      const id = getMatchId(m);
+      gamesMap[id] = m;
+    });
+    let changed = false;
+    favorites.forEach(fav => {
+      const id = fav.id;
+      if (gamesMap[id]) {
+        favMatchData[id] = gamesMap[id];
+        changed = true;
+      }
+    });
+    if (changed) {
+      checkForEvents();
+      renderFavBar();
+    }
+  } catch (_) {}
+}
 
 function setLang(lang) {
   currentLang = lang;
@@ -699,5 +991,19 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   initTicker();
+
+  document.addEventListener('click', e => {
+    const star = e.target.closest('.star-btn');
+    if (star) {
+      e.stopPropagation();
+      toggleFavorite(star.dataset.matchId);
+    }
+  });
+
+  window.addEventListener('beforeunload', () => {
+    if (pollInterval) clearInterval(pollInterval);
+    if (countdownInterval) clearInterval(countdownInterval);
+  });
+
   loadData();
 });
