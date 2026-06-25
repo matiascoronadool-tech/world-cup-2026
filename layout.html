@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>World Cup 2026</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header role="banner">
+    <span id="header-title">FIFA World Cup 2026</span>
+    <span class="lang-toggle">
+      <button class="lang-btn active" data-lang="en">EN</button>
+      <button class="lang-btn" data-lang="es">ES</button>
+    </span>
+  </header>
+  <div class="ticker" role="marquee" aria-live="polite" id="ticker"><span id="ticker-text"></span></div>
+  <div class="main">
+    <aside role="navigation" aria-label="Section navigation">
+      <ul>
+        <li class="active" data-tab="today" id="tab-label-today">Played Today</li>
+        <li data-tab="upcoming" id="tab-label-upcoming">Coming Matches</li>
+        <li data-tab="past" id="tab-label-past">Past Played</li>
+      </ul>
+    </aside>
+    <section role="main" aria-live="polite">
+      <div class="tab active" id="tab-today">
+        <h2 id="today-heading">Today's Matches</h2>
+        <div id="today-content"><div class="loading"><div class="loading-dots"><span></span><span></span><span></span></div></div></div>
+      </div>
+      <div class="tab" id="tab-upcoming">
+        <h2 id="upcoming-heading">Upcoming Matches</h2>
+        <div id="upcoming-content"><div class="loading"><div class="loading-dots"><span></span><span></span><span></span></div></div></div>
+      </div>
+      <div class="tab" id="tab-past">
+        <h2 id="past-heading">Past Results</h2>
+        <div id="past-content"><div class="loading"><div class="loading-dots"><span></span><span></span><span></span></div></div></div>
+      </div>
+    </section>
+  </div>
+  <footer role="contentinfo"><span id="footer-times">Times shown in</span> <span id="tz-display">your timezone</span> · <a href="https://worldcup26.ir" target="_blank" rel="noopener">worldcup26.ir</a></footer>
+  <script src="dist/app.js"></script>
+</body>
+</html>

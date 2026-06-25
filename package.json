@@ -1,0 +1,13 @@
+{
+  "name": "fifa-worldcup-2026",
+  "private": true,
+  "scripts": {
+    "build": "esbuild src/app.js --bundle --minify --outfile=dist/app.js",
+    "dev": "esbuild src/app.js --bundle --outfile=dist/app.js --sourcemap",
+    "watch": "esbuild src/app.js --bundle --outfile=dist/app.js --sourcemap --watch",
+    "serve": "npx serve ."
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
